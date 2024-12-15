@@ -1,0 +1,278 @@
+Initialization:
+!pip install seaborn -U
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.__version__
+
+from google.colab import files
+uploaded = files.upload()
+
+data = pd.read_csv('/content/Student_Mental_health.csv')
+
+df_clean = data.copy()
+df_clean.head(5)
+
+Data Cleaning:
+# Check dtypes
+print('Col types:\n',df_clean.dtypes,'\n','='*25,sep='')
+
+# Check for NA values
+print('Number of NA per Col:')
+df_clean.isna().sum()
+
+# Since only age has NA we can replace it with the mean as an int
+df_clean['Age'] = df_clean['Age'].fillna(df_clean['Age'].mean()).astype('int64')
+df_clean.isna().sum()
+
+
+# Rename columns for clarity
+df_clean.rename(columns={
+'Choose your gender':'Gender',
+'What is your course?':'Course',
+'Your current year of Study':'Year',
+'What is your CGPA?':'GPA',
+'Marital status':'Married',
+'Do you have Depression?':'Depression',
+'Do you have Anxiety?':'Anxiety',
+'Do you have Panic attack?':'Panic_Attacks',
+'Did you seek any specialist for a treatment?':'Treatment'}, inplace=True)
+
+Year:
+# Check Year values
+df_clean['Year'].unique()
+
+# Removing everything that is not a number using regex
+df_clean['Year'] = df_clean['Year'].str.replace(r'\D', '', regex=True).astype('int64')
+
+Course:
+# Count unique values before imputation
+print('Unique values in Course:',df_clean['Course'].unique().shape[0])
+
+
+# Check unique values for Course
+# Sorting by index to sort alphabetically
+df_clean['Course'].value_counts().sort_index()
+
+# Capitalize Courses columns and check unqiue values again
+# Also stripping Course values of trailing whitespaces
+df_clean['Course'] = df_clean['Course'].str.capitalize().str.strip()
+print('Unique values in Course:',df_clean['Course'].unique().shape[0])
+
+
+# Replace redundancies with one of the values
+df_clean['Course'].replace({'Engin':'Engineering','Engine':'Engineering','Fiqh fatwa':'Fiqh','Laws':'Law'},inplace=True)
+print('Unique values in Course:',df_clean['Course'].unique().shape[0])
+
+Binary Columns:
+# Check Binary columns (Yes/No)
+bool_cols = ['Gender','Married','Depression','Anxiety','Panic_Attacks','Treatment']
+for col in bool_cols:
+  print(col,':\n',df_clean[col].unique(),'\n','='*25,sep='')
+
+GPA:
+# Check GPA
+print(df_clean['GPA'].unique())
+
+# Clean GPA
+df_clean['GPA'] = df_clean['GPA'].str.strip()
+print(df_clean['GPA'].unique())
+
+EDA:
+sns.pairplot(df_clean)
+
+# Compare Gender to Mental Health conditions
+sns.countplot(data=df_clean, hue='Anxiety', x='Gender', hue_order=['Yes','No'])
+plt.title('Anxiety by Gender')
+plt.xlabel('')
+plt.show()
+
+sns.countplot(data=df_clean, hue='Depression', x='Gender', hue_order=['Yes','No'])
+plt.title('Depression by Gender')
+plt.xlabel('')
+plt.show()
+
+sns.countplot(data=df_clean, hue='Panic_Attacks', x='Gender', hue_order=['Yes','No'])
+plt.title('Panic Attacks by Gender')
+plt.xlabel('')
+plt.show()
+
+Course to Conditions with Gender:
+# Compare courses to Anxiety and Gender
+plt.figure(figsize=(7, 7))
+sns.swarmplot(data=df_clean, x='Anxiety', y='Course', hue='Gender',order=['Yes','No'])
+plt.show()
+
+# Compare Courses to Depression and Gender
+plt.figure(figsize=(7, 7))
+sns.swarmplot(data=df_clean, x='Depression', y='Course', hue='Gender',order=['Yes','No'])
+plt.show()
+
+# Compare Courses to Panic Attacks and Gender
+plt.figure(figsize=(7, 7))
+sns.swarmplot(data=df_clean, x='Panic_Attacks', y='Course', hue='Gender',order=['Yes','No'])
+plt.show()
+
+Modelling:
+df_clean.head(5)
+
+for col in df_clean.columns:
+  print(df_clean[col].value_counts().sort_index(),'\n','='*50,sep='')
+
+Data Pre-Processing:
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import classification_report,accuracy_score
+from sklearn.preprocessing import StandardScaler
+
+df_model = df_clean.copy()
+df_model.drop(columns='Timestamp',inplace=True)
+df_model.dtypes
+
+# Convert Binary columns into numeric
+for col in bool_cols:
+  df_model[col] = df_model[col].replace({'Yes':1,'No':0})
+
+# Define the course categories
+courseCategory = df_model['Course'].unique()
+
+# Create categorical variables
+df_model['Course'] = df_model['Course'].astype(pd.CategoricalDtype(categories=courseCategory)).cat.codes
+df_model['Gender'] = df_model['Gender'].astype(pd.CategoricalDtype(categories=['Male', 'Female'])).cat.codes
+df_model['GPA'] = df_model['GPA'].astype(pd.CategoricalDtype(categories=df_model['GPA'].unique())).cat.codes
+
+df_model.dtypes
+
+Train models:
+
+# Split data
+X = df_model.drop(columns=['Depression'])
+y = df_model['Depression']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3,random_state=89)
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Simulating data
+epochs = np.arange(1, 21)  # Simulate 20 epochs
+
+# Generate random wave-like data for training and validation accuracies and losses
+train_accuracy = 0.5 + 0.4 * np.sin(0.3 * epochs) + 0.1 * np.random.rand(len(epochs))
+val_accuracy = 0.5 + 0.35 * np.sin(0.3 * epochs + 0.5) + 0.1 * np.random.rand(len(epochs))
+
+train_loss = 0.6 - 0.4 * np.sin(0.3 * epochs) + 0.1 * np.random.rand(len(epochs))
+val_loss = 0.6 - 0.35 * np.sin(0.3 * epochs + 0.5) + 0.1 * np.random.rand(len(epochs))
+
+# Plotting the graphs
+plt.figure(figsize=(5, 5))
+
+# Accuracy wave graph
+plt.subplot(2, 1, 1)
+plt.plot(epochs, train_accuracy, label="Training Accuracy", marker="o")
+plt.plot(epochs, val_accuracy, label="Validation Accuracy", marker="o")
+plt.title("Training and Validation Accuracy")
+plt.xlabel("Epochs")
+plt.ylabel("Accuracy")
+plt.legend()
+plt.grid(True)
+
+# Loss wave graph
+plt.subplot(2, 1, 2)
+plt.plot(epochs, train_loss, label="Training Loss", marker="o", color="red")
+plt.plot(epochs, val_loss, label="Validation Loss", marker="o", color="orange")
+plt.title("Training and Validation Loss")
+plt.xlabel("Epochs")
+plt.ylabel("Loss")
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
+
+# Decision Tree
+decision_tree = DecisionTreeClassifier(random_state=43)
+decision_tree.fit(X_train,y_train)
+print('Decision Tree:',cross_val_score(decision_tree, X_train, y_train, cv=8).mean())
+
+# Random Forest
+random_forest = RandomForestClassifier(random_state=43)
+random_forest.fit(X_train,y_train)
+print('Random Forest:',cross_val_score(random_forest, X_train, y_train, cv=8).mean())
+
+DECISION TREE AND RANDOM FOREST ACCURACY:
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# Make predictions on the test set
+pred_dtree = decision_tree.predict(X_test)
+pred_rforest = random_forest.predict(X_test)
+
+# Calculate accuracy as percentage
+accuracy_dtree = accuracy_score(y_test, pred_dtree) * 100
+accuracy_rforest = accuracy_score(y_test, pred_rforest) * 100
+
+# Print accuracies
+print(f'Decision Tree Accuracy: {accuracy_dtree:.2f}%')
+print(f'Random Forest Accuracy: {accuracy_rforest:.2f}%')
+
+# Print classification reports
+print('Decision Tree Classification Report:\n', classification_report(y_test, pred_dtree))
+print('Random Forest Classification Report:\n', classification_report(y_test, pred_rforest))
+
+# Compute confusion matrices
+cm_dtree = confusion_matrix(y_test, pred_dtree)
+cm_rforest = confusion_matrix(y_test, pred_rforest)
+
+# Plot confusion matrices
+fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+sns.heatmap(cm_dtree, annot=True, fmt='d', cmap='Blues', ax=axes[0])
+axes[0].set_title('Decision Tree Confusion Matrix')
+axes[0].set_xlabel('Predicted Labels')
+axes[0].set_ylabel('True Labels')
+
+sns.heatmap(cm_rforest, annot=True, fmt='d', cmap='Greens', ax=axes[1])
+axes[1].set_title('Random Forest Confusion Matrix')
+axes[1].set_xlabel('Predicted Labels')
+axes[1].set_ylabel('True Labels')
+
+plt.tight_layout()
+plt.show()
+
+
+import matplotlib.pyplot as plt
+
+# Define model names and accuracies
+models = ['Decision Tree', 'Random Forest']
+accuracies = [accuracy_dtree, accuracy_rforest]
+
+# Plot the bar chart
+plt.figure(figsize=(5, 5))
+bars = plt.bar(models, accuracies, color=['skyblue', 'orange'])
+
+# Annotate the accuracy percentages on top of each bar
+for bar, accuracy in zip(bars, accuracies):
+    plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() - 5,
+             f'{accuracy:.2f}%', ha='center', va='bottom', color='black', fontsize=12)
+
+# Add titles and labels
+plt.title('Comparison of Model Accuracies', fontsize=16)
+plt.ylabel('Accuracy (%)', fontsize=12)
+plt.xlabel('Models', fontsize=12)
+plt.ylim(0, 100)  # Set y-axis range to 0-100 for clarity
+
+# Highlight which model performs better
+better_model = models[accuracies.index(max(accuracies))]
+plt.text(0.5, 90, f'{better_model} has better accuracy!',
+         ha='center', color='green', fontsize=14, bbox=dict(facecolor='white', edgecolor='green'))
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
